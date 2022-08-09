@@ -16,12 +16,12 @@ import (
 
 func TestChart(t *testing.T) {
 	m := map[time.Time]*DayTime{
-		time.Date(2022, time.August, 3, 0, 0, 0, 0, time.UTC): {
-			Start: time.Date(2022, time.August, 3, 0, 0, 0, 0, time.UTC),
-			End:   time.Date(2022, time.August, 3, 24, 0, 0, 0, time.UTC),
+		time.Date(2022, time.August, 8, 0, 0, 0, 0, time.UTC): {
+			Start: time.Date(2022, time.August, 8, 0, 0, 0, 0, time.UTC),
+			End:   time.Date(2022, time.August, 8, 24, 0, 0, 0, time.UTC),
 		},
 	}
-	chart, err := NewCandlestickChart(PeriodMinute, m)
+	chart, err := NewCandlestickChart(PeriodMinute, m, time.UTC)
 	if err != nil {
 		log.Fatalln(err)
 	}

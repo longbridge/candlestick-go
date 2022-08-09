@@ -76,44 +76,46 @@ type CandlestickChart struct {
 	exit             chan struct{}
 }
 
-func NewCandlestickChart(period Period, timeRange map[time.Time]*DayTime) (*CandlestickChart, error) {
+func NewCandlestickChart(period Period, timeRange map[time.Time]*DayTime, loc *time.Location) (*CandlestickChart, error) {
 	chart := &CandlestickChart{
 		candlesticks:     make([]*Candlestick, 0, 8),
 		candleTimeSeries: make(map[time.Time]*Candlestick, 8),
 		timeSeries: TimeSeries{
 			period:    period,
 			timeRange: timeRange,
+			loc:       loc,
 		},
 		exit: make(chan struct{}, 1),
 	}
-	x, err := chart.timeSeries.NextX(time.Now().UTC())
+	now := time.Now()
+	x, err := chart.timeSeries.NextX(now)
 	if err != nil {
 		return nil, err
 	}
 	go func() {
-		d := x.Sub(time.Now().UTC())
+		d := x.Sub(now)
 		timer := time.NewTimer(d)
 		for {
 			select {
 			case <-chart.exit:
 				timer.Stop()
-				break
 			case <-timer.C:
-				now := time.Now().UTC()
-				chart.AddEmpty(now)
+				now := time.Now()
+				chart.AddEmpty(now.Add(-time.Minute))
 				nx, err := chart.timeSeries.NextX(now)
 				if err != nil {
 					fmt.Println(err)
 					nx = now.Add(time.Hour)
 				}
-				fmt.Println(nx.Sub(now))
-				timer.Reset(nx.Sub(now))
+				nextDuration := nx.Sub(now)
+				timer.Reset(nextDuration)
 			}
 		}
 	}()
 
 	return chart, nil
 }
+
 func (chart *CandlestickChart) AddEmpty(t time.Time) error {
 	x, err := chart.timeSeries.ToX(t)
 	if err != nil {
@@ -187,6 +189,7 @@ type TimeSeries struct {
 	period    Period
 	timeRange map[time.Time]*DayTime
 	endTime   time.Time
+	loc       *time.Location
 }
 
 func (ts *TimeSeries) ToX(t time.Time) (time.Time, error) {
@@ -197,7 +200,7 @@ func (ts *TimeSeries) ToX(t time.Time) (time.Time, error) {
 }
 
 func (ts *TimeSeries) onRange(t time.Time) bool {
-	dt := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
+	dt := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, ts.loc)
 	dayTime, ok := ts.timeRange[dt]
 	if !ok {
 		return false
@@ -209,6 +212,7 @@ func (ts *TimeSeries) onRange(t time.Time) bool {
 }
 
 func (ts *TimeSeries) toX(t time.Time) time.Time {
+	t = t.In(ts.loc)
 	switch ts.period {
 	case PeriodMinute:
 		return t.Truncate(time.Minute)
@@ -221,11 +225,11 @@ func (ts *TimeSeries) toX(t time.Time) time.Time {
 	case PeriodHour:
 		return t.Truncate(time.Minute).Round(time.Hour)
 	case PeriodDay:
-		return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
+		return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, ts.loc)
 	case PeriodMonth:
-		return time.Date(t.Year(), t.Month(), 0, 0, 0, 0, 0, time.UTC)
+		return time.Date(t.Year(), t.Month(), 0, 0, 0, 0, 0, ts.loc)
 	case PeriodYear:
-		return time.Date(t.Year(), 0, 0, 0, 0, 0, 0, time.UTC)
+		return time.Date(t.Year(), 0, 0, 0, 0, 0, 0, ts.loc)
 	default:
 		return t.Truncate(time.Minute)
 	}
@@ -245,16 +249,16 @@ func (ts *TimeSeries) NextX(t time.Time) (time.Time, error) {
 	case PeriodHour:
 		x = x.Add(time.Hour)
 	case PeriodDay:
-		x = time.Date(t.Year(), t.Month(), t.Day()+1, 0, 0, 0, 0, time.UTC)
+		x = time.Date(t.Year(), t.Month(), t.Day()+1, 0, 0, 0, 0, ts.loc)
 	case PeriodMonth:
-		x = time.Date(t.Year(), t.Month()+1, 0, 0, 0, 0, 0, time.UTC)
+		x = time.Date(t.Year(), t.Month()+1, 0, 0, 0, 0, 0, ts.loc)
 	case PeriodYear:
-		x = time.Date(t.Year()+1, 0, 0, 0, 0, 0, 0, time.UTC)
+		x = time.Date(t.Year()+1, 0, 0, 0, 0, 0, 0, ts.loc)
 	default:
 		x = t.Add(time.Minute)
 	}
 
-	dt := time.Date(x.Year(), x.Month(), x.Day(), 0, 0, 0, 0, time.UTC)
+	dt := time.Date(x.Year(), x.Month(), x.Day(), 0, 0, 0, 0, ts.loc)
 	dayTime, ok := ts.timeRange[dt]
 	if ok && x.Before(dayTime.End) && x.After(dayTime.Start) {
 		return x, nil
