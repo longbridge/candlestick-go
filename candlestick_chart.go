@@ -14,7 +14,7 @@ type Period uint8
 const (
 	PeriodMinute Period = iota
 	PeriodFiveMinute
-	PeriodQuatorHour
+	PeriodQuarterHour
 	PeriodHalfHour
 	PeriodHour
 	PeriodDay
@@ -101,7 +101,7 @@ func NewCandlestickChart(period Period, timeRange map[time.Time]*DayTime, loc *t
 				timer.Stop()
 			case <-timer.C:
 				now := time.Now()
-				chart.AddEmpty(now.Add(-time.Minute))
+				_ = chart.AddEmpty(now.Add(-time.Minute))
 				nx, err := chart.timeSeries.NextX(now)
 				if err != nil {
 					fmt.Println(err)
@@ -117,7 +117,7 @@ func NewCandlestickChart(period Period, timeRange map[time.Time]*DayTime, loc *t
 }
 
 func (chart *CandlestickChart) AddEmpty(t time.Time) error {
-	x, err := chart.timeSeries.ToX(t)
+	x, err := chart.timeSeries.NextX(t)
 	if err != nil {
 		return err
 	}
@@ -143,7 +143,7 @@ func (chart *CandlestickChart) AddEmpty(t time.Time) error {
 
 func (chart *CandlestickChart) AddTrade(t time.Time, value decimal.Decimal, volume int64) error {
 	res := make([]*Candlestick, 0)
-	x, err := chart.timeSeries.ToX(t)
+	x, err := chart.timeSeries.NextX(t)
 	if err != nil {
 		return err
 	}
@@ -217,19 +217,27 @@ func (ts *TimeSeries) toX(t time.Time) time.Time {
 	case PeriodMinute:
 		return t.Truncate(time.Minute)
 	case PeriodFiveMinute:
-		return t.Truncate(time.Minute).Round(5 * time.Minute)
-	case PeriodQuatorHour:
-		return t.Truncate(time.Minute).Round(15 * time.Minute)
+		return t.Truncate(5 * time.Minute)
+	case PeriodQuarterHour:
+		return t.Truncate(15 * time.Minute)
 	case PeriodHalfHour:
-		return t.Truncate(time.Minute).Round(30 * time.Minute)
+		return t.Truncate(30 * time.Minute)
 	case PeriodHour:
-		return t.Truncate(time.Minute).Round(time.Hour)
+		return t.Truncate(time.Hour)
 	case PeriodDay:
 		return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, ts.loc)
+	case PeriodWeek:
+		offset := t.Weekday() - 1
+		if offset < 0 {
+			offset = 6
+		}
+		nt := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, ts.loc)
+		nt = nt.Add(time.Duration(-offset) * 24 * time.Hour)
+		return nt
 	case PeriodMonth:
-		return time.Date(t.Year(), t.Month(), 0, 0, 0, 0, 0, ts.loc)
+		return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, ts.loc)
 	case PeriodYear:
-		return time.Date(t.Year(), 0, 0, 0, 0, 0, 0, ts.loc)
+		return time.Date(t.Year(), 1, 1, 0, 0, 0, 0, ts.loc)
 	default:
 		return t.Truncate(time.Minute)
 	}
@@ -242,7 +250,7 @@ func (ts *TimeSeries) NextX(t time.Time) (time.Time, error) {
 		x = x.Add(time.Minute)
 	case PeriodFiveMinute:
 		x = x.Add(5 * time.Minute)
-	case PeriodQuatorHour:
+	case PeriodQuarterHour:
 		x = x.Add(15 * time.Minute)
 	case PeriodHalfHour:
 		x = x.Add(30 * time.Minute)
@@ -250,6 +258,8 @@ func (ts *TimeSeries) NextX(t time.Time) (time.Time, error) {
 		x = x.Add(time.Hour)
 	case PeriodDay:
 		x = time.Date(t.Year(), t.Month(), t.Day()+1, 0, 0, 0, 0, ts.loc)
+	case PeriodWeek:
+		x = time.Date(t.Year(), t.Month(), t.Day()+7, 0, 0, 0, 0, ts.loc)
 	case PeriodMonth:
 		x = time.Date(t.Year(), t.Month()+1, 0, 0, 0, 0, 0, ts.loc)
 	case PeriodYear:
