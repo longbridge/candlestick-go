@@ -2,7 +2,6 @@ package candlestick
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 
 	// "os"
@@ -62,12 +61,13 @@ func TestChart(t *testing.T) {
 			"delay": 113, "value": 23, "volume": 35,
 		},
 	}
+	log.Println("market is opening..")
 	for _, tx := range txs {
 		go trade(chart, tx)
 	}
 	time.Sleep(5 * time.Minute)
 	b, _ := json.Marshal(chart.candlesticks)
-	fmt.Println(string(b))
+	log.Println(string(b))
 }
 
 func trade(chart *CandlestickChart, tx map[string]any) {

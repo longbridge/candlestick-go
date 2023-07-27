@@ -117,7 +117,7 @@ func NewCandlestickChart(period Period, timeRange map[time.Time]*DayTime, loc *t
 }
 
 func (chart *CandlestickChart) AddEmpty(t time.Time) error {
-	x, err := chart.timeSeries.ToX(t)
+	x, err := chart.timeSeries.NextX(t)
 	if err != nil {
 		return err
 	}
@@ -143,7 +143,7 @@ func (chart *CandlestickChart) AddEmpty(t time.Time) error {
 
 func (chart *CandlestickChart) AddTrade(t time.Time, value decimal.Decimal, volume int64) error {
 	res := make([]*Candlestick, 0)
-	x, err := chart.timeSeries.ToX(t)
+	x, err := chart.timeSeries.NextX(t)
 	if err != nil {
 		return err
 	}
